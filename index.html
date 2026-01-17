@@ -1,11 +1,406 @@
-<input id="token" placeholder="输入邀请码" />
-<button onclick="draw()">抽座位</button>
-<div id="out"></div>
+<!DOCTYPE html>
+<html lang="EN">
+  <head> 
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>年会座位抽签</title>
+
+    <style>
+      :root{
+        --bg1:#2a0006;
+        --bg2:#120003;
+        --gold1:#ffd27a;
+        --gold2:#ffb84d;
+        --red1:#d1001f;
+        --red2:#8f0012;
+        --card: rgba(255, 220, 170, .08);
+        --stroke: rgba(255, 215, 160, .22);
+        --text: rgba(255,255,255,.92);
+        --muted: rgba(255,255,255,.72);
+        --radius: 20px;
+      }
+
+      *{ box-sizing:border-box; }
+      body{
+        margin:0;
+        min-height:100vh;
+        color:var(--text);
+        font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        padding: clamp(20px, 4vw, 40px);
+        background:
+          radial-gradient(1200px 800px at 10% 10%, rgba(255, 184, 77, .15), transparent 55%),
+          radial-gradient(900px 600px at 90% 15%, rgba(209, 0, 31, .2), transparent 60%),
+          radial-gradient(900px 700px at 50% 110%, rgba(255, 210, 122, .1), transparent 60%),
+          linear-gradient(180deg, var(--bg1), var(--bg2));
+        overflow-x:hidden;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+      }
+
+      /* 背景浮尘粒子 */
+      .sparkle{
+        position:fixed;
+        inset:-40px;
+        pointer-events:none;
+        background-image:
+          radial-gradient(circle at 20% 30%, rgba(255, 215, 160, .20) 0 2px, transparent 3px),
+          radial-gradient(circle at 75% 20%, rgba(255, 184, 77, .18) 0 2px, transparent 3px),
+          radial-gradient(circle at 60% 60%, rgba(255, 215, 160, .14) 0 1px, transparent 2px),
+          radial-gradient(circle at 30% 75%, rgba(255, 184, 77, .14) 0 1px, transparent 2px);
+        filter: blur(0.2px);
+        opacity:.7;
+        animation: float 10s ease-in-out infinite;
+      }
+      @keyframes float{
+        0%,100%{ transform: translateY(0); }
+        50%{ transform: translateY(-15px); }
+      }
+
+      /* 入场动画类 */
+      .anim-up {
+        opacity: 0;
+        transform: translateY(20px);
+        animation: slideUpFade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      }
+      .delay-1 { animation-delay: 0.1s; }
+      .delay-2 { animation-delay: 0.2s; }
+      .delay-3 { animation-delay: 0.3s; }
+
+      @keyframes slideUpFade {
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .wrap{
+        max-width: 720px;
+        width: 100%;
+        margin: 0 auto;
+        position:relative;
+        z-index:2;
+      }
+
+      /* Hero & Logo 区域 */
+      .hero{
+        text-align:center;
+        padding-bottom: 20px;
+      }
+
+/* --- 2. 长方形 Logo 适配样式 --- */
+      .logo-container {
+        /* 高度固定，宽度自适应，最大宽度限制 */
+        height: 64px; 
+        width: auto;
+        max-width: 240px;
+        margin: 0 auto 24px;
+        
+        /* 圆角矩形，带磨砂效果 */
+        border-radius: 12px;
+        padding: 6px 16px;
+        border: 1px solid rgba(255, 215, 160, .25);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(8px);
+        
+        /* 呼吸光效 */
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 10px rgba(255, 184, 77, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.3s ease;
+        animation: cardBreath 4s infinite ease-in-out;
+      }
+      /* 鼠标悬停 Logo 稍微放大 */
+      .logo-container:hover {
+        transform: scale(1.02);
+      }
+
+      @keyframes cardBreath {
+        0%, 100% { box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 10px rgba(255, 184, 77, 0.1); }
+        50% { box-shadow: 0 4px 25px rgba(0,0,0,0.4), 0 0 18px rgba(255, 184, 77, 0.25); }
+      }
+
+      .logo-img {
+        /* 关键：contain 确保图片完整显示 */
+        height: 100%;
+        width: auto;
+        max-width: 100%;
+        object-fit: contain;
+        display:block;
+        filter: drop-shadow(0 0 8px rgba(255, 215, 160, 1));
+      }
+      /* --- Logo 样式结束 --- */
+
+      .badge{
+        display:inline-block;
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 215, 160, .3);
+        background: rgba(0,0,0,.3);
+        color: var(--gold2);
+        font-size: 13px;
+        letter-spacing:1px;
+        font-weight: 600;
+      }
+
+      .title{
+        margin: 16px 0 8px;
+        font-size: clamp(32px, 7vw, 52px);
+        letter-spacing: 2px;
+        font-weight: 800;
+        line-height: 1.1;
+        background: linear-gradient(180deg, #fff, var(--gold1));
+        -webkit-background-clip: text;
+        background-clip:text;
+        color: transparent;
+        text-shadow: 0 10px 30px rgba(209, 0, 31, 0.3);
+      }
+
+      .sub{
+        margin:0;
+        color: var(--muted);
+        font-size: clamp(14px, 3vw, 17px);
+      }
+
+      .card{
+        margin-top: 20px;
+        background: var(--card);
+        border: 1px solid var(--stroke);
+        border-radius: var(--radius);
+        padding: clamp(20px, 4vw, 30px);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 20px 50px rgba(0,0,0,.4);
+        position:relative;
+        overflow:hidden;
+      }
+
+      /* 卡片顶部金光装饰 */
+      .card::before{
+        content:"";
+        position:absolute;
+        top:0; left:0; right:0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--gold1), transparent);
+        opacity: 0.6;
+      }
+
+      label{
+        display:block;
+        margin: 0 0 10px 2px;
+        color: var(--gold2);
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing:0.5px;
+      }
+
+      .row{
+        display:flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items:center;
+      }
+
+      input{
+        flex:1;
+        min-width: 200px;
+        height: 58px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 215, 160, .3);
+        background: rgba(0,0,0,.3);
+        color: #fff;
+        padding: 0 20px;
+        font-size: 17px;
+        outline: none;
+        transition: all 0.3s ease;
+      }
+      input:focus {
+        border-color: var(--gold1);
+        box-shadow: 0 0 0 4px rgba(255, 215, 160, 0.1);
+        background: rgba(0,0,0,.5);
+      }
+      input::placeholder{ color: rgba(255,255,255,.4); }
+
+      /* 按钮特效 */
+      button{
+        height: 58px;
+        padding: 0 28px;
+        border-radius: 16px;
+        border: none;
+        background: linear-gradient(135deg, var(--red1), #a30018);
+        color: #fff;
+        font-weight: 700;
+        font-size: 17px;
+        cursor: pointer;
+        letter-spacing:1px;
+        box-shadow: 0 8px 25px rgba(209, 0, 31, 0.3);
+        transition: transform 0.1s ease, box-shadow 0.3s ease, filter 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      /* 按钮流光 */
+      button::after {
+        content: '';
+        position: absolute;
+        top: 0; left: -100%;
+        width: 50%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transform: skewX(-20deg);
+        transition: 0.5s;
+      }
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 35px rgba(209, 0, 31, 0.45);
+      }
+      button:hover::after {
+        left: 150%;
+        transition: 0.7s;
+      }
+      button:active{ transform: scale(0.96); }
+      button:disabled{ 
+        opacity:.6; cursor:not-allowed; 
+        background: var(--bg2);
+        color: #888;
+        box-shadow: none;
+        transform:none;
+      }
+
+      /* 输出区域 */
+      .out{
+        margin-top: 24px;
+        min-height: 80px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        text-align:center;
+        border-radius: 16px;
+        border: 1px dashed rgba(255, 215, 160, .2);
+        background: rgba(0,0,0,.2);
+        font-size: clamp(18px, 4vw, 24px);
+        line-height: 1.5;
+        color: #fff;
+        font-weight: 500;
+      }
+      /* 滚动文字动画 */
+      .shuffling {
+        font-family: monospace; /* 等宽字体防止抖动 */
+        color: var(--gold1);
+        animation: textPulse 0.1s infinite;
+      }
+      @keyframes textPulse { 0%{opacity:0.8;} 100%{opacity:1;} }
+
+      .result{
+        margin-top: 20px;
+        display:grid;
+        gap: 12px;
+        opacity: 0; /* 初始隐藏 */
+        transform: scale(0.95);
+        transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .result.show {
+        opacity: 1;
+        transform: scale(1);
+      }
+      
+      .kv{
+        display:flex;
+        justify-content:space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 20px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 215, 160, .15);
+        background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.2));
+      }
+      .k{ color: var(--muted); font-size: 15px; }
+      .v{ font-weight: 700; color: #fff; font-size: 18px; }
+      
+      /* 座位号特别样式 */
+      .v.seat{
+        background: linear-gradient(180deg, #fff, var(--gold2));
+        -webkit-background-clip: text;
+        background-clip:text;
+        color: transparent;
+        font-size: clamp(22px, 5vw, 28px);
+        letter-spacing: 1px;
+        text-shadow: 0 2px 10px rgba(255, 184, 77, 0.2);
+      }
+
+      .hint{
+        margin-top: 20px;
+        color: rgba(255,255,255,.5);
+        font-size: 13px;
+        line-height: 1.6;
+        text-align: center;
+      }
+
+      .footer{
+        text-align:center;
+        margin-top: 40px;
+        color: rgba(255,255,255,.4);
+        font-size: 12px;
+      }
+
+      @media (max-width: 520px){
+        button{ width:100%; }
+        input{ min-width: 100%; }
+        .kv{ flex-direction: row; justify-content:space-between; }
+        .card{ padding: 20px; }
+      }
+
+      /* 撒花 Confetti 容器 */
+      #confetti-canvas {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 999;
+      }
+    </style>
+  </head>
+
+<body>
+  <canvas id="confetti-canvas"></canvas>
+  <div class="sparkle"></div>
+
+  <div class="wrap">
+    <div class="hero anim-up">
+      <!-- Logo 区域 -->
+      <div class="logo-container">
+        <!-- 请将 src 中的链接替换为您公司的 Logo 图片链接 -->
+        <!-- 目前使用一个随机图片作为演示 -->
+        <img src="logo.png" alt="Company Logo" class="logo-img">
+      </div>
+      
+      <div class="badge delay-1" style="display:inline-block">✨ Annual Gala</div>
+      <h1 class="title delay-1">Seat Lottery</h1>
+      <p class="sub delay-2">Enter your Branch number to secure your exclusive seat</p>
+    </div>
+
+    <div class="card anim-up delay-2">
+      <label for="token">BRANCH NUMBER</label>
+      <div class="row">
+        <input id="token" placeholder="e.g. b01" inputmode="text" autocapitalize="none" autocomplete="off" />
+        <button id="btn" onclick="draw()">Draw Now</button>
+      </div>
+
+      <div id="out" class="out">Waiting for the draw...</div>
+
+      <div id="result" class="result">
+        <div class="kv"><div class="k">Branch</div><div class="v" id="rBranch"></div></div>
+        <div class="kv"><div class="k">Seat</div><div class="v seat" id="rSeat"></div></div>
+      </div>
+
+      <div class="hint">
+        💡 One draw per branch. Results are saved automatically.
+      </div>
+    </div>
+
+    <div class="footer anim-up delay-3">Best wishes for a successful Annual Gala and a wonderful year ahead</div>
+  </div>
 
 <script>
+// --- 1. 核心逻辑 ---
 const API_URL = "https://script.google.com/macros/s/AKfycbyIcOGGpGCVV0EeybAwKpURpGtUQB_xaPSjlnCLhtDEHxToMndt33lo4PYMapop-Pxd/exec";
 
-
+// JSONP 封装
 function jsonp(params) {
   return new Promise((resolve, reject) => {
     const cb = "cb_" + Math.random().toString(36).slice(2);
@@ -18,7 +413,7 @@ function jsonp(params) {
     const timer = setTimeout(() => {
       cleanup();
       reject(new Error("JSONP_TIMEOUT"));
-    }, 10000);
+    }, 12000); // 增加超时时间以防网络慢
 
     function cleanup() {
       clearTimeout(timer);
@@ -41,23 +436,176 @@ function jsonp(params) {
   });
 }
 
+// 状态控制
+let isDrawing = false;
+let shuffleTimer = null;
+
+// 模拟滚动效果的数据
+const dummySeats = ["11", "15", "12", "8", "1", "2", "9", "6"];
+
 async function draw() {
-  const token = document.getElementById("token").value.trim();
+  if (isDrawing) return;
+  
+  const tokenEl = document.getElementById("token");
   const out = document.getElementById("out");
-  out.innerText = "抽取中...";
+  const btn = document.getElementById("btn");
+  const resultArea = document.getElementById("result");
+  
+  const token = tokenEl.value.trim();
+
+  // 简单校验
+  if (!token) {
+    shakeInput(tokenEl);
+    out.innerText = "Please input branch number";
+    return;
+  }
+
+  // UI 进入加载状态
+  isDrawing = true;
+  btn.disabled = true;
+  btn.innerText = "Drawing...";
+  resultArea.classList.remove("show"); // 隐藏旧结果
+  out.classList.add("shuffling"); // 添加跳动字体类
+
+  // 启动“洗牌”视觉特效 (数字快速滚动)
+  shuffleTimer = setInterval(() => {
+    const randomSeat = dummySeats[Math.floor(Math.random() * dummySeats.length)];
+    out.innerText = `Looking for seat... \n ${randomSeat}`;
+  }, 80);
 
   try {
+    // 第一步：查询状态
     const status = await jsonp({ action: "status", token });
-    if (!status.ok) { out.innerText = "失败：" + status.error; return; }
-    if (status.done) { out.innerText = `你们分支：${status.branch}\n已抽过：${status.seat}`; return; }
+    
+    // 停止洗牌动画
+    clearInterval(shuffleTimer);
+    out.classList.remove("shuffling");
 
+    if (!status.ok) { 
+      showError(out, "Fail:" + status.error); 
+      return; 
+    }
+
+    // 如果已经抽过了
+    if (status.done) { 
+      showResult(status.branch, status.seat, false);
+      out.innerText = "Already Assigned";
+      return; 
+    }
+
+    // 第二步：执行抽签
+    // 这里可以重新开启一小会儿动画增加悬念
+    out.innerText = "Locking Seat...";
+    
     const res = await jsonp({ action: "draw", token });
-    if (!res.ok) { out.innerText = "抽取失败：" + res.error; return; }
+    if (!res.ok) { 
+      showError(out, "Draw Failed: " + res.error); 
+      return; 
+    }
 
-    out.innerText = `✅ 抽取成功\n分支：${res.branch}\n座位：${res.seat}`;
+    // 成功！
+    showResult(res.branch, res.seat, true);
+    out.innerText = "🎉 Congratulation！";
+    fireStardust(); // 触发撒花
+
   } catch (e) {
-    out.innerText = "请求异常：" + String(e);
+    clearInterval(shuffleTimer);
+    out.classList.remove("shuffling");
+    showError(out, "Network error. Please try again");
+    console.error(e);
+  } finally {
+    isDrawing = false;
+    btn.disabled = false;
+    btn.innerText = "Draw Now";
   }
 }
 
+function showError(el, msg) {
+  el.innerText = msg;
+  el.style.color = "#ff8fa3"; // 错误提示变红一点
+  setTimeout(() => { el.style.color = "#fff"; }, 2000);
+}
+
+function showResult(branch, seat, isNew) {
+  document.getElementById("rBranch").innerText = branch;
+  document.getElementById("rSeat").innerText = seat;
+  document.getElementById("result").classList.add("show");
+}
+
+function shakeInput(el) {
+  el.style.transform = "translateX(5px)";
+  setTimeout(() => el.style.transform = "translateX(-5px)", 50);
+  setTimeout(() => el.style.transform = "translateX(5px)", 100);
+  setTimeout(() => el.style.transform = "translateX(0)", 150);
+}
+
+
+// --- 2. 简易 Confetti (撒花) 特效 ---
+// 这是一个轻量级的 JS 实现，不依赖外部库
+const canvas = document.getElementById("confetti-canvas");
+const ctx = canvas.getContext("2d");
+let particles = [];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// === 金色星尘特效逻辑 ===
+function fireStardust() {
+  particles = []; // 清空旧粒子
+  // 金色系配色：亮金、浅黄、白色、橙金
+  const colors = ['#ffd27a', '#fff', '#ffeb3b', '#ffaa00']; 
+
+  // 生成 120 个微粒
+  for (let i = 0; i < 120; i++) {
+    particles.push({
+      x: window.innerWidth / 2, // 从屏幕中心 X 开始
+      y: window.innerHeight / 2 + 100, // 从结果卡片附近开始
+      radius: Math.random() * 2.5 + 0.5, // 半径 0.5px - 3px（非常细小）
+      vx: (Math.random() - 0.5) * 18, // 水平爆炸速度
+      vy: (Math.random() - 1) * 18 - 2, // 垂直向上爆发速度
+      color: colors[Math.floor(Math.random() * colors.length)],
+      alpha: 1, // 初始透明度
+      decay: Math.random() * 0.015 + 0.01 // 消失速度（越大约快）
+    });
+  }
+  // 开始渲染循环
+  requestAnimationFrame(renderStardust);
+}
+
+function renderStardust() {
+  // 清空画布
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let active = false;
+
+  particles.forEach((p) => {
+    if (p.alpha > 0) {
+      active = true;
+      
+      // 更新位置
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15; // 加一点重力，让星尘缓缓下落
+      p.alpha -= p.decay; // 逐渐消失
+
+      // 绘制粒子（圆点）
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  });
+
+  // 如果还有粒子没消失，继续动画
+  if (active) requestAnimationFrame(renderStardust);
+}
 </script>
+</body>
+</html>
