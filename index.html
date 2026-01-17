@@ -3,16 +3,24 @@
 <div id="out"></div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyCCk83Ivs9_TFCISPHUa--qHgG_p7jaVfXejopmPGpMMZZ8WjIo7iFLjVQ4o7uQauj/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyIcOGGpGCVV0EeybAwKpURpGtUQB_xaPSjlnCLhtDEHxToMndt33lo4PYMapop-Pxd/exec";
 
 async function post(action, token) {
+  const form = new URLSearchParams();
+  form.set("action", action);
+  form.set("token", token);
+
   const r = await fetch(API_URL, {
     method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ action, token })
+    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+    body: form.toString(),
   });
-  return await r.json();
+
+  const text = await r.text();
+  try { return JSON.parse(text); }
+  catch { return { ok:false, error:"NON_JSON_RESPONSE", text }; }
 }
+
 
 async function draw() {
   const token = document.getElementById("token").value.trim();
