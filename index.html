@@ -5,35 +5,59 @@
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbyIcOGGpGCVV0EeybAwKpURpGtUQB_xaPSjlnCLhtDEHxToMndt33lo4PYMapop-Pxd/exec";
 
-async function post(action, token) {
-  const form = new URLSearchParams();
-  form.set("action", action);
-  form.set("token", token);
 
-  const r = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-    body: form.toString(),
+function jsonp(params) {
+  return new Promise((resolve, reject) => {
+    const cb = "cb_" + Math.random().toString(36).slice(2);
+    params.callback = cb;
+
+    const qs = new URLSearchParams(params).toString();
+    const url = API_URL + "?" + qs;
+
+    const script = document.createElement("script");
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("JSONP_TIMEOUT"));
+    }, 10000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      script.remove();
+    }
+
+    window[cb] = (data) => {
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("JSONP_LOAD_ERROR"));
+    };
+
+    script.src = url;
+    document.body.appendChild(script);
   });
-
-  const text = await r.text();
-  try { return JSON.parse(text); }
-  catch { return { ok:false, error:"NON_JSON_RESPONSE", text }; }
 }
-
 
 async function draw() {
   const token = document.getElementById("token").value.trim();
   const out = document.getElementById("out");
   out.innerText = "抽取中...";
 
-  const status = await post("status", token);
-  if (!status.ok) { out.innerText = "邀请码无效"; return; }
-  if (status.done) { out.innerText = `你们分支：${status.branch}\n已抽过：${status.seat}`; return; }
+  try {
+    const status = await jsonp({ action: "status", token });
+    if (!status.ok) { out.innerText = "失败：" + status.error; return; }
+    if (status.done) { out.innerText = `你们分支：${status.branch}\n已抽过：${status.seat}`; return; }
 
-  const res = await post("draw", token);
-  if (!res.ok) { out.innerText = "抽取失败：" + res.error; return; }
+    const res = await jsonp({ action: "draw", token });
+    if (!res.ok) { out.innerText = "抽取失败：" + res.error; return; }
 
-  out.innerText = `✅ 抽取成功\n分支：${res.branch}\n座位：${res.seat}`;
+    out.innerText = `✅ 抽取成功\n分支：${res.branch}\n座位：${res.seat}`;
+  } catch (e) {
+    out.innerText = "请求异常：" + String(e);
+  }
 }
+
 </script>
